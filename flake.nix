@@ -2,7 +2,7 @@
   description = "invert.nvim development environmnet";
 
   inputs = {
-    flake-utils.url = "github.com:numtide/flake-utils";
+    flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
   };
 
@@ -12,23 +12,42 @@
       nixpkgs,
       ...
     }@inputs:
-    flake-utils.eachDefaultSystem (
+    flake-utils.lib.eachDefaultSystem (
       system:
       let
-        luaPkgs = nixpkgs.luajitPackages;
+        pkgs = import nixpkgs { inherit system; };
+
+        inherit (pkgs) mkShell;
+        inherit (pkgs.lib.attrsets) mapAttrs;
+
+        packages = with pkgs; [
+          luajit
+          luajitPackages.luarocks
+          luajitPackages.busted
+        ];
+
+        versions =
+          # sh
+          ''
+            echo "LuaJIT $(lua -v | cut -d ' ' -f 2)"
+            echo "Rocks  $(luarocks --version | head -n 1 | cut -d ' ' -f 2)"
+            echo "Busted $(busted --version)"
+          '';
       in
       {
-        devShells.default = pkgs.mkShell {
-          packages = with luaPkgs; [
-            luajit
-            luarocks
-            busted
-          ];
-
-          shellHook = ''
-            echo "Lua: $(lua --version)"
-            echo "Rocks: $(luarocks --version)"
-          '';
+        devShells = mapAttrs (_: mkShell) {
+          default = {
+            inherit packages;
+            shellHook = versions;
+          };
+          fish = {
+            packages = packages ++ [ pkgs.fish ];
+            shellHook = ''
+              ${versions}
+              echo "Fish   $(fish --version | cut -d ' ' -f 3)"
+              exec fish
+            '';
+          };
         };
       }
     );
