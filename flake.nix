@@ -16,20 +16,20 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        luaPkgs = pkgs.lua51Packages;
 
         inherit (pkgs) mkShell;
         inherit (pkgs.lib.attrsets) mapAttrs;
 
         packages = with pkgs; [
-          luajit
-          luajitPackages.luarocks
-          luajitPackages.busted
+          lua
+          neovim
         ];
 
         versions =
           # sh
           ''
-            echo "LuaJIT $(lua -v | cut -d ' ' -f 2)"
+            echo "Lua    $(lua -v | cut -d ' ' -f 2)"
             echo "Rocks  $(luarocks --version | head -n 1 | cut -d ' ' -f 2)"
             echo "Busted $(busted --version)"
           '';
@@ -44,8 +44,21 @@
             packages = packages ++ [ pkgs.fish ];
             shellHook = ''
               ${versions}
-              echo "Fish   $(fish --version | cut -d ' ' -f 3)"
               exec fish
+            '';
+          };
+          test = {
+            packages =
+              packages
+              ++ (with luaPkgs; [
+                busted
+                luacov
+                nlua
+              ]);
+            shellHook = ''
+              ${versions}
+              exec busted ./tests/
+              exit $?
             '';
           };
         };
