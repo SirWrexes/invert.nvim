@@ -1,5 +1,5 @@
 {
-  description = "invert.nvim development environmnet";
+  description = "invert.nvim development environment";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -16,14 +16,23 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        luaPkgs = pkgs.lua51Packages;
 
-        inherit (pkgs) mkShell;
-        inherit (pkgs.lib.attrsets) mapAttrs;
+        inherit (pkgs) lib mkShell;
+        inherit (lib.attrsets) mapAttrs;
 
         packages = with pkgs; [
-          lua
+          lua5_1
           neovim
+        ];
+
+        testPackages = with pkgs; [
+          (lua5_1.withPackages (
+            p: with p; [
+              nlua
+              busted
+              luacov
+            ]
+          ))
         ];
 
         versions =
@@ -47,20 +56,20 @@
               exec fish
             '';
           };
-          test = {
-            packages =
-              packages
-              ++ (with luaPkgs; [
-                busted
-                luacov
-                nlua
-              ]);
-            shellHook = ''
-              ${versions}
-              exec busted ./tests/
-              exit $?
-            '';
-          };
+        };
+        apps.test = {
+          type = "app";
+          program = lib.getExe (
+            pkgs.writeShellApplication {
+              name = "busting-makes-me-feel-good";
+              runtimeInputs = packages ++ testPackages;
+              text =
+                # sh
+                ''
+                  busted ./tests/
+                '';
+            }
+          );
         };
       }
     );
